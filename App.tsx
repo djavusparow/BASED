@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Twitter, 
-  Wallet, 
   CheckCircle2, 
   AlertCircle, 
   ShieldCheck,
@@ -23,7 +22,7 @@ import {
   Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import sdk from '@farcaster/frame-sdk';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { 
   UserStats, 
   ScoreBreakdown, 
@@ -102,7 +101,10 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         generateAppLogo().then(setAppLogoUrl);
+        
+        // Use the new SDK context pattern
         const context = await sdk.context;
+        
         if (context?.user) {
           const userFid = context.user.fid;
           setFid(userFid);
@@ -120,15 +122,20 @@ const App: React.FC = () => {
             farcasterConnected: true
           };
           setCurrentUser(userData);
+          
           const claimKey = `claimed_fid_${userFid}`;
           const historyKey = `history_fid_${userFid}`;
           if (localStorage.getItem(claimKey)) setHasClaimed(true);
           const savedHistory = localStorage.getItem(historyKey);
           if (savedHistory) setClaimHistory(JSON.parse(savedHistory));
         }
-        sdk.actions.ready();
+
+        // Inform the Miniapp SDK we are ready
+        await sdk.actions.ready();
       } catch (e) {
         console.error("Initialization failed:", e);
+        // Ensure ready is called even on failure to avoid white screens
+        sdk.actions.ready().catch(() => {});
       }
     };
     init();
@@ -265,7 +272,7 @@ const App: React.FC = () => {
 
   const handleGlobalShare = () => {
     const text = "🔵 Check your contribution score on BASED IMPRESSION! \n\nI'm earning my $LAMBOLESS future on @base with @baseapp. Join the movement! 🏎️💨";
-    const appUrl = "https://based-impression.vercel.app";
+    const appUrl = window.location.origin;
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(appUrl)}`;
     window.open(url, '_blank');
   };
@@ -358,7 +365,7 @@ const App: React.FC = () => {
                       {identityLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5 text-sky-400" />}
                     </button>
                     <button onClick={syncTwitterData} disabled={!currentUser || twitterSyncing || hasClaimed} className="p-3 bg-white/5 border border-white/10 text-white rounded-xl hover:bg-white/10 transition-colors disabled:opacity-30 group" title="Sync Twitter">
-                      {twitterSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Twitter className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />}
+                      <Twitter className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
                     </button>
                     <button onClick={handleManualCalculate} disabled={!currentUser || loading || generatingImage || hasClaimed} className="p-3 bg-white text-black rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-30 shadow-[0_0_15px_rgba(255,255,255,0.2)]">
                       {loading || generatingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
@@ -394,8 +401,7 @@ const App: React.FC = () => {
                      { label: "Farcaster Connectivity", desc: "Native Frame context", check: currentUser?.farcasterConnected, icon: <FarcasterLogo className="text-purple-400" />, action: connectFarcaster, isProcessing: farcasterLoading },
                      { label: "Web3 Identity Resolver", desc: "ENS or fName Link", check: currentUser?.identityType !== 'NONE', icon: <Globe className="text-sky-400" />, action: resolveIdentity, isProcessing: identityLoading },
                      { label: "Twitter Connectivity", desc: "Linked to BaseApp", check: currentUser?.twitterConnected, icon: <Twitter className="text-sky-400" /> },
-                     { label: "Leaderboard Ranking", desc: "Must be Top 1000", check: currentUser && currentUser.rank <= 1000, icon: <Trophy className="text-yellow-500" /> },
-                     { label: "$LAMBOLESS Balance", desc: "Hold > $1", check: currentUser && currentUser.lamboLessBalance >= 1, icon: <Wallet className="text-purple-400" /> }
+                     { label: "Leaderboard Ranking", desc: "Must be Top 1000", check: currentUser && currentUser.rank <= 1000, icon: <Trophy className="text-yellow-500" /> }
                    ].map((req, i) => (
                      <div key={i} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${req.check ? "bg-white/[0.08] border-white/10" : "bg-white/5 border-white/5"}`}>
                         <div className="flex items-center gap-3"><div className="w-4 h-4">{req.icon}</div><div><p className="text-xs font-semibold">{req.label}</p><p className="text-[9px] text-gray-500">{req.desc}</p></div></div>
